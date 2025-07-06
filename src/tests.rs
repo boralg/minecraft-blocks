@@ -40,7 +40,6 @@ fn block_declarations(node: Node, src: &[u8]) -> Vec<String> {
 
 fn extract_block_declarations(node: Node, src: &[u8], out: &mut Vec<String>) {
     let mut cur = node.walk();
-    //println!("{}", node.kind());
 
     if node.kind() == "field_declaration" {
         let mut is_block = false;

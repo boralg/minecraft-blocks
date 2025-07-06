@@ -71,6 +71,17 @@ pub fn extract_string_literal(node: Node, src: &[u8]) -> Option<String> {
             }
             None
         }
+        // "BlockKeys.PUMPKIN"
+        "field_access" => {
+            let mut cur = node.walk();
+            let children: Vec<_> = node.named_children(&mut cur).collect();
+
+            if children.len() >= 2 && children[1].kind() == "identifier" {
+                let field_name = children[1].utf8_text(src).ok()?;
+                return Some(field_name.to_lowercase());
+            }
+            None
+        }
         _ => None,
     }
 }
