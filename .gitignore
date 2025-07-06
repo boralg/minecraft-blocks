@@ -1,0 +1,7 @@
+target
+result
+.cargo
+.direnv
+
+mc_src/*
+!mc_src/.gitkeep
