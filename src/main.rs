@@ -72,6 +72,7 @@ pub fn extract_string_literal(node: Node, src: &[u8]) -> Option<String> {
             None
         }
         // "BlockKeys.PUMPKIN"
+        // TODO: parse BlockKeys instead
         "field_access" => {
             let mut cur = node.walk();
             let children: Vec<_> = node.named_children(&mut cur).collect();
