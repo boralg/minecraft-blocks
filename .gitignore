@@ -3,5 +3,5 @@ result
 .cargo
 .direnv
 
-mc_src/*
-!mc_src/.gitkeep
+mc_data/*
+!mc_data/.gitkeep
