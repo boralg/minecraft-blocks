@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::{fs, process};
 
 #[derive(Debug, Serialize)]
@@ -41,7 +41,7 @@ struct ModelElement {
 
 fn identify_full_cube_blocks(models_dir: &str) -> HashSet<String> {
     let mut full_cube_blocks = HashSet::new();
-    let mut model_cache: BTreeMap<String, bool> = BTreeMap::new();
+    let mut model_cache: HashMap<String, bool> = HashMap::new();
 
     let entries = fs::read_dir("mc_data/mc_assets/assets/minecraft/blockstates").unwrap();
 
@@ -93,7 +93,7 @@ fn identify_full_cube_blocks(models_dir: &str) -> HashSet<String> {
 fn is_variant_full_cube(
     variant_value: &Value,
     models_dir: &str,
-    cache: &mut BTreeMap<String, bool>,
+    cache: &mut HashMap<String, bool>,
 ) -> bool {
     match variant_value {
         Value::Object(obj) => {
@@ -119,7 +119,7 @@ fn is_variant_full_cube(
 fn is_model_full_cube(
     model_path: &str,
     models_dir: &str,
-    cache: &mut BTreeMap<String, bool>,
+    cache: &mut HashMap<String, bool>,
 ) -> bool {
     fn elements_is_cube(model: &Model) -> bool {
         for element in &model.elements {
