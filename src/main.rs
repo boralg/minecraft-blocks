@@ -175,7 +175,6 @@ fn is_model_full_cube(
     false
 }
 
-
 fn get_all_block_variants(blockstates_dir: &str) -> Vec<BlockVariant> {
     let entries = fs::read_dir(blockstates_dir).unwrap_or_else(|e| {
         eprintln!("Failed to read directory {}: {}", blockstates_dir, e);
@@ -224,7 +223,7 @@ fn get_all_block_variants(blockstates_dir: &str) -> Vec<BlockVariant> {
             }
         } else if !blockstate.multipart.is_empty() {
             let properties = multipart_properties(&blockstate.multipart);
-            let combinations = generate_combinations(&properties);
+            let combinations = multipart_combinations(&properties);
 
             for combo in combinations {
                 if combo.is_empty() {
@@ -251,6 +250,35 @@ fn get_all_block_variants(blockstates_dir: &str) -> Vec<BlockVariant> {
 }
 
 fn multipart_properties(multipart: &[MultipartCase]) -> BTreeMap<String, BTreeSet<String>> {
+    fn properties_from_condition(
+        condition: &Value,
+        properties: &mut BTreeMap<String, BTreeSet<String>>,
+    ) {
+        match condition {
+            Value::Object(obj) => {
+                for (key, value) in obj {
+                    if key == "OR" || key == "AND" {
+                        if let Value::Array(arr) = value {
+                            for item in arr {
+                                properties_from_condition(item, properties);
+                            }
+                        }
+                    } else {
+                        if let Value::String(val_str) = value {
+                            let values: Vec<&str> = val_str.split('|').collect();
+                            let prop_set =
+                                properties.entry(key.clone()).or_insert_with(BTreeSet::new);
+                            for v in values {
+                                prop_set.insert(v.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     let mut properties: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for case in multipart {
@@ -273,35 +301,7 @@ fn multipart_properties(multipart: &[MultipartCase]) -> BTreeMap<String, BTreeSe
     properties
 }
 
-fn properties_from_condition(
-    condition: &Value,
-    properties: &mut BTreeMap<String, BTreeSet<String>>,
-) {
-    match condition {
-        Value::Object(obj) => {
-            for (key, value) in obj {
-                if key == "OR" || key == "AND" {
-                    if let Value::Array(arr) = value {
-                        for item in arr {
-                            properties_from_condition(item, properties);
-                        }
-                    }
-                } else {
-                    if let Value::String(val_str) = value {
-                        let values: Vec<&str> = val_str.split('|').collect();
-                        let prop_set = properties.entry(key.clone()).or_insert_with(BTreeSet::new);
-                        for v in values {
-                            prop_set.insert(v.to_string());
-                        }
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn generate_combinations(properties: &BTreeMap<String, BTreeSet<String>>) -> Vec<String> {
+fn multipart_combinations(properties: &BTreeMap<String, BTreeSet<String>>) -> Vec<String> {
     if properties.is_empty() {
         return vec![String::new()];
     }
