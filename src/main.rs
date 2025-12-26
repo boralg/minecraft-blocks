@@ -39,7 +39,7 @@ struct ModelElement {
     to: [f32; 3],
 }
 
-fn identify_full_cube_blocks(models_dir: &str) -> HashSet<String> {
+fn get_all_full_cube_blocks(models_dir: &str) -> HashSet<String> {
     let mut full_cube_blocks = HashSet::new();
     let mut model_cache: HashMap<String, bool> = HashMap::new();
 
@@ -176,6 +176,80 @@ fn is_model_full_cube(
 }
 
 
+fn get_all_block_variants(blockstates_dir: &str) -> Vec<BlockVariant> {
+    let entries = fs::read_dir(blockstates_dir).unwrap_or_else(|e| {
+        eprintln!("Failed to read directory {}: {}", blockstates_dir, e);
+        process::exit(1);
+    });
+
+    let mut all_variants = Vec::new();
+
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+
+        let block_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap()
+            .to_string();
+
+        let content = fs::read_to_string(&path).unwrap_or_else(|e| {
+            eprintln!("Failed to read {}: {}", path.display(), e);
+            process::exit(1);
+        });
+
+        let blockstate: BlockState = serde_json::from_str(&content).unwrap_or_else(|e| {
+            eprintln!("Failed to parse {}: {}", path.display(), e);
+            process::exit(1);
+        });
+
+        if !blockstate.variants.is_empty() {
+            for variant_key in blockstate.variants.keys() {
+                if variant_key.is_empty() {
+                    all_variants.push(BlockVariant {
+                        name: block_name.clone(),
+                        blockstate: None,
+                    });
+                } else {
+                    all_variants.push(BlockVariant {
+                        name: block_name.clone(),
+                        blockstate: Some(variant_key.clone()),
+                    });
+                }
+            }
+        } else if !blockstate.multipart.is_empty() {
+            let properties = multipart_properties(&blockstate.multipart);
+            let combinations = generate_combinations(&properties);
+
+            for combo in combinations {
+                if combo.is_empty() {
+                    all_variants.push(BlockVariant {
+                        name: block_name.clone(),
+                        blockstate: None,
+                    });
+                } else {
+                    all_variants.push(BlockVariant {
+                        name: block_name.clone(),
+                        blockstate: Some(combo),
+                    });
+                }
+            }
+        } else {
+            all_variants.push(BlockVariant {
+                name: block_name,
+                blockstate: None,
+            });
+        }
+    }
+
+    all_variants
+}
+
 fn multipart_properties(multipart: &[MultipartCase]) -> BTreeMap<String, BTreeSet<String>> {
     let mut properties: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
@@ -271,75 +345,7 @@ fn main() {
     let blockstates_dir = "mc_data/mc_assets/assets/minecraft/blockstates";
     let models_dir = "mc_data/mc_assets/assets/minecraft/models/block";
 
-    let entries = fs::read_dir(blockstates_dir).unwrap_or_else(|e| {
-        eprintln!("Failed to read directory {}: {}", blockstates_dir, e);
-        process::exit(1);
-    });
-
-    let mut all_variants = Vec::new();
-
-    for entry in entries {
-        let entry = entry.unwrap();
-        let path = entry.path();
-
-        if path.extension().and_then(|s| s.to_str()) != Some("json") {
-            continue;
-        }
-
-        let block_name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap()
-            .to_string();
-
-        let content = fs::read_to_string(&path).unwrap_or_else(|e| {
-            eprintln!("Failed to read {}: {}", path.display(), e);
-            process::exit(1);
-        });
-
-        let blockstate: BlockState = serde_json::from_str(&content).unwrap_or_else(|e| {
-            eprintln!("Failed to parse {}: {}", path.display(), e);
-            process::exit(1);
-        });
-
-        if !blockstate.variants.is_empty() {
-            for variant_key in blockstate.variants.keys() {
-                if variant_key.is_empty() {
-                    all_variants.push(BlockVariant {
-                        name: block_name.clone(),
-                        blockstate: None,
-                    });
-                } else {
-                    all_variants.push(BlockVariant {
-                        name: block_name.clone(),
-                        blockstate: Some(variant_key.clone()),
-                    });
-                }
-            }
-        } else if !blockstate.multipart.is_empty() {
-            let properties = multipart_properties(&blockstate.multipart);
-            let combinations = generate_combinations(&properties);
-
-            for combo in combinations {
-                if combo.is_empty() {
-                    all_variants.push(BlockVariant {
-                        name: block_name.clone(),
-                        blockstate: None,
-                    });
-                } else {
-                    all_variants.push(BlockVariant {
-                        name: block_name.clone(),
-                        blockstate: Some(combo),
-                    });
-                }
-            }
-        } else {
-            all_variants.push(BlockVariant {
-                name: block_name,
-                blockstate: None,
-            });
-        }
-    }
+    let all_variants = get_all_block_variants(blockstates_dir);
 
     let json_output = serde_json::to_string_pretty(&all_variants).unwrap();
     fs::write("blocks.json", &json_output).unwrap_or_else(|e| {
@@ -348,7 +354,7 @@ fn main() {
     });
     println!("Saved {} block variants to blocks.json", all_variants.len());
 
-    let full_cube_blocks = identify_full_cube_blocks(models_dir);
+    let full_cube_blocks = get_all_full_cube_blocks(models_dir);
 
     let full_variants: Vec<BlockVariant> = all_variants
         .into_iter()
