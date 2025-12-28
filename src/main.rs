@@ -1,4 +1,4 @@
-mod full_cubes;
+mod cubes;
 mod schema;
 mod textures;
 mod variants;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{fs, process};
 
-use crate::full_cubes::get_all_full_cube_blocks;
+use crate::cubes::{get_all_empty_blocks, get_all_full_cube_blocks};
 use crate::schema::{blockstate, model};
 use crate::textures::get_block_textures;
 use crate::variants::{BlockVariant, get_all_block_variants};
@@ -66,13 +66,25 @@ fn main() {
         })
         .collect();
 
-    let full_json_output = serde_json::to_string_pretty(&full_variants).unwrap();
-    fs::write("full_blocks.json", &full_json_output).unwrap_or_else(|e| {
+    let json_output = serde_json::to_string_pretty(&full_variants).unwrap();
+    fs::write("full_blocks.json", &json_output).unwrap_or_else(|e| {
         eprintln!("Failed to write full_blocks.json: {}", e);
         process::exit(1);
     });
     println!(
         "Saved {} full cube block variants to full_blocks.json",
         full_variants.len()
+    );
+
+    let empty_blocks = get_all_empty_blocks(&blockstates, &models);
+
+    let json_output = serde_json::to_string_pretty(&empty_blocks).unwrap();
+    fs::write("empty_blocks.json", &json_output).unwrap_or_else(|e| {
+        eprintln!("Failed to write empty_blocks.json: {}", e);
+        process::exit(1);
+    });
+    println!(
+        "Saved {} empty blocks to empty_blocks.json",
+        empty_blocks.len()
     );
 }

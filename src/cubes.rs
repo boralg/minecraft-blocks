@@ -8,6 +8,33 @@ use crate::schema::{
     model::Model,
 };
 
+pub fn get_all_empty_blocks(
+    blockstates: &HashMap<String, BlockState>,
+    models: &HashMap<String, Model>,
+) -> HashSet<String> {
+    let mut empty_blocks = HashSet::new();
+
+    for (block_name, blockstate) in blockstates {
+        if blockstate.is_multipart() || blockstate.variants.len() != 1 {
+            continue;
+        }
+
+        let (_, v) = blockstate.variants.iter().next().unwrap();
+        if v.models().len() != 1 {
+            continue;
+        }
+
+        let model = models
+            .get(&v.models()[0].model)
+            .expect("Model should exist");
+        if model.elements.is_empty() && model.parent.is_none() && model.textures.is_empty() {
+            empty_blocks.insert(block_name.to_owned());
+        }
+    }
+
+    empty_blocks
+}
+
 pub fn get_all_full_cube_blocks(
     blockstates: &HashMap<String, BlockState>,
     models: &HashMap<String, Model>,
