@@ -43,10 +43,7 @@ fn is_variant_full_cube(variant: &ModelVariant, models: &HashMap<String, Model>)
     }
 }
 
-fn is_model_full_cube(model_path: &str, models: &HashMap<String, Model>) -> bool {
-    let model_name = model_path
-        .trim_start_matches("minecraft:block/")
-        .trim_start_matches("block/");
+fn is_model_full_cube(model_name: &str, models: &HashMap<String, Model>) -> bool {
     let model = models.get(model_name).expect("Model should exist");
 
     let is_full_cube = !model.elements.is_empty()

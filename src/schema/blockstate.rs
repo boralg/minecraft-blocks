@@ -141,6 +141,9 @@ pub fn load_all<P: AsRef<Path>>(dir: P) -> io::Result<HashMap<String, BlockState
             Ok(c) => c,
             Err(_) => continue,
         };
+        let content = content
+            .replace("minecraft:block/", "")
+            .replace("block/", "");
 
         let blockstate: BlockState = match serde_json::from_str(&content) {
             Ok(bs) => bs,

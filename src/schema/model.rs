@@ -133,6 +133,9 @@ pub fn load_all<P: AsRef<Path>>(dir: P) -> io::Result<HashMap<String, Model>> {
             Ok(c) => c,
             Err(_) => continue,
         };
+        let content = content
+            .replace("minecraft:block/", "")
+            .replace("block/", "");
 
         let model: Model = match serde_json::from_str(&content) {
             Ok(m) => m,

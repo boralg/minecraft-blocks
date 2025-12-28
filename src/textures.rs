@@ -128,15 +128,9 @@ pub fn get_block_textures(
         .expect("Blockstate key should exist")
         .models()[0]; // TODO: multiple textures per block e.g. stone
 
-    let model = models
-        .get(
-            m.model
-                .trim_start_matches("minecraft:block/")
-                .trim_start_matches("block/"),
-        ) // TODO: get rid of these
-        .expect("Model should exist");
+    let model = models.get(&m.model).expect("Model should exist");
     let cube_element = full_cube_element(model, models);
-    
+
     let [down, up, north, south, west, east] = ["down", "up", "north", "south", "west", "east"]
         .map(|f| {
             resolve_texture_variable(
@@ -177,9 +171,6 @@ fn resolve_texture_variable(
     let mut parent = parent;
 
     while let Some(parent_name) = parent {
-        let parent_name = parent_name
-            .trim_start_matches("minecraft:block/")
-            .trim_start_matches("block/");
         let par = models.get(parent_name).expect("Model should exist");
 
         for (k, v) in par.textures.clone() {
@@ -213,10 +204,7 @@ fn full_cube_element(model: &Model, models: &HashMap<String, Model>) -> Element 
         return cube.clone();
     }
 
-    if let Some(parent_path) = &model.parent {
-        let parent_name = parent_path
-            .trim_start_matches("minecraft:block/")
-            .trim_start_matches("block/");
+    if let Some(parent_name) = &model.parent {
         let parent_model = models.get(parent_name).expect("Model should exist");
 
         return full_cube_element(&parent_model, models);
