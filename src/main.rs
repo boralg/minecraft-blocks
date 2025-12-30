@@ -3,37 +3,12 @@ mod schema;
 mod textures;
 mod variants;
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::{fs, process};
 
 use crate::cubes::{get_all_empty_blocks, get_all_full_cube_blocks};
 use crate::schema::{blockstate, model};
 use crate::textures::get_block_textures;
 use crate::variants::{BlockVariant, get_all_block_variants};
-
-#[derive(Debug, Deserialize)]
-struct Model {
-    #[serde(default)]
-    parent: Option<String>,
-    #[serde(default)]
-    elements: Vec<ModelElement>,
-    #[serde(default)]
-    textures: HashMap<String, String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct ModelElement {
-    from: [f32; 3],
-    to: [f32; 3],
-    #[serde(default)]
-    faces: HashMap<String, Face>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct Face {
-    texture: String,
-}
 
 fn main() {
     let blockstates = blockstate::load_all("mc_data/mc_assets/assets/minecraft/blockstates")

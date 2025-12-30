@@ -1,13 +1,10 @@
-use std::{collections::HashMap, fs};
+use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::{
-    schema::{
-        blockstate::{self, BlockState},
-        model::{Element, Model},
-    },
-    textures,
+use crate::schema::{
+    blockstate::BlockState,
+    model::{Element, Model},
 };
 
 #[derive(Debug, Serialize, Clone)]

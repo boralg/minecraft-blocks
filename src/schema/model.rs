@@ -106,11 +106,6 @@ fn is_zero_i32(value: &i32) -> bool {
     *value == 0
 }
 
-pub fn load<P: AsRef<Path>>(path: P) -> io::Result<Model> {
-    let content = fs::read_to_string(path)?;
-    serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-}
-
 pub fn load_all<P: AsRef<Path>>(dir: P) -> io::Result<HashMap<String, Model>> {
     let mut models = HashMap::new();
 

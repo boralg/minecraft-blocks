@@ -1,10 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::schema::{
-    blockstate::{self, BlockState, ModelVariant},
+    blockstate::{BlockState, ModelVariant},
     model::Model,
 };
 
