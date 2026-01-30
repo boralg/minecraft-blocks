@@ -2,109 +2,33 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::schema::{
-    blockstate::BlockState,
-    model::{Element, Model},
+use crate::{
+    palette::{BlockTexture, FaceTexture, Rotation},
+    schema::{
+        blockstate::BlockState,
+        model::{Element, Model},
+    },
 };
 
 #[derive(Debug, Serialize, Clone)]
 pub struct FaceTextureRefs {
-    down: String,
-    up: String,
-    north: String,
-    south: String,
-    west: String,
-    east: String,
+    pub x: String,
+    pub nx: String,
+    pub y: String,
+    pub ny: String,
+    pub z: String,
+    pub nz: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Texture {
-    path: String,
-    rotation: i32,
-}
-
-impl Texture {
-    fn new(path: String) -> Self {
-        Self { path, rotation: 0 }
-    }
-
-    fn add_rotation(&self, degrees: i32) -> Self {
-        Self {
-            path: self.path.clone(),
-            rotation: (self.rotation + degrees) % 360,
-        }
-    }
-
-    fn to_string(&self) -> String {
-        if self.rotation == 0 {
-            self.path.clone()
-        } else {
-            format!("{}#{}", self.path, self.rotation)
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FaceTextures {
-    down: Texture,
-    up: Texture,
-    north: Texture,
-    south: Texture,
-    west: Texture,
-    east: Texture,
-}
-
-impl FaceTextures {
-    fn rotate_x(self, degrees: i32) -> Self {
-        if degrees == 0 {
-            return self;
-        }
-        Self {
-            down: self.north.add_rotation(0),
-            up: self.south.add_rotation(0),
-            north: self.up.add_rotation(0),
-            south: self.down.add_rotation(0),
-            west: self.west.add_rotation(360 - degrees),
-            east: self.east.add_rotation(degrees),
-        }
-    }
-
-    fn rotate_y(self, degrees: i32) -> Self {
-        if degrees == 0 {
-            return self;
-        }
-        Self {
-            down: self.down.add_rotation(360 - degrees),
-            up: self.up.add_rotation(degrees),
-            north: self.east.add_rotation(0),
-            south: self.west.add_rotation(0),
-            west: self.north.add_rotation(0),
-            east: self.south.add_rotation(0),
-        }
-    }
-
-    fn rotate_z(self, degrees: i32) -> Self {
-        if degrees == 0 {
-            return self;
-        }
-        Self {
-            down: self.west.add_rotation(0),
-            up: self.east.add_rotation(0),
-            north: self.north.add_rotation(degrees),
-            south: self.south.add_rotation(360 - degrees),
-            west: self.up.add_rotation(0),
-            east: self.down.add_rotation(0),
-        }
-    }
-
+impl BlockTexture {
     fn to_face_texture_refs(&self) -> FaceTextureRefs {
         FaceTextureRefs {
-            down: self.down.to_string(),
-            up: self.up.to_string(),
-            north: self.north.to_string(),
-            south: self.south.to_string(),
-            west: self.west.to_string(),
-            east: self.east.to_string(),
+            x: self.x.to_string(),
+            nx: self.nx.to_string(),
+            y: self.y.to_string(),
+            ny: self.ny.to_string(),
+            z: self.z.to_string(),
+            nz: self.nz.to_string(),
         }
     }
 }
@@ -114,7 +38,7 @@ pub fn get_block_textures(
     blockstate_key: &str,
     models: &HashMap<String, Model>,
     blockstates: &HashMap<String, BlockState>,
-) -> Option<FaceTextureRefs> {
+) -> BlockTexture {
     let blockstate = blockstates
         .get(block_name)
         .expect("Blockstate should exist");
@@ -142,20 +66,20 @@ pub fn get_block_textures(
             )
         });
 
-    let mut face_textures = FaceTextures {
-        down: Texture::new(down),
-        up: Texture::new(up),
-        north: Texture::new(north),
-        south: Texture::new(south),
-        west: Texture::new(west),
-        east: Texture::new(east),
+    let mut block_texture = BlockTexture {
+        x: FaceTexture::new(east),
+        nx: FaceTexture::new(west),
+        y: FaceTexture::new(up),
+        ny: FaceTexture::new(down),
+        z: FaceTexture::new(north),
+        nz: FaceTexture::new(south),
     };
 
-    face_textures = face_textures.rotate_x(m.x);
-    face_textures = face_textures.rotate_y(m.y);
-    face_textures = face_textures.rotate_z(m.z);
+    block_texture = block_texture.rotate_x(Rotation::from_degrees(m.x).unwrap());
+    block_texture = block_texture.rotate_y(Rotation::from_degrees(m.y).unwrap());
+    block_texture = block_texture.rotate_z(Rotation::from_degrees(m.z).unwrap());
 
-    Some(face_textures.to_face_texture_refs())
+    block_texture
 }
 
 fn resolve_texture_variable(

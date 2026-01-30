@@ -1,0 +1,393 @@
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
+
+use serde::{Deserialize, Serialize};
+
+pub struct Palette {
+    name: String,
+    id: String,
+    materials: Vec<Material>,
+    groups: Vec<Group>,
+    variant_sets: Vec<VariantSet>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Material {
+    pub block_id: String,
+    pub display: MaterialDisplay,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub profile: Option<MaterialProfile>,
+}
+
+// TODO: default
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MaterialProfile {
+    pub light_color: Color, // a = luminosity
+    pub opaque_bloom: Color,
+    pub transparent_bloom: Color,
+    pub opaque_reflect: f32,
+    pub transparent_reflect: f32,
+    pub transparent_refract: f32,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MaterialDisplay {
+    Texture(BlockTexture),
+    TextureAnimation {
+        frames: Vec<BlockTexture>,
+        delay: Duration,
+    },
+    Volume(BlockVolume),
+    VolumeAnimation {
+        frames: Vec<BlockVolume>,
+        delay: Duration,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BlockTexture {
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub x: FaceTexture,
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub nx: FaceTexture,
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub y: FaceTexture,
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub ny: FaceTexture,
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub z: FaceTexture,
+    #[serde(
+        serialize_with = "serialize_face_string",
+        deserialize_with = "deserialize_face_string"
+    )]
+    pub nz: FaceTexture,
+}
+
+fn serialize_face_string<S>(face: &FaceTexture, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_str(&face.to_string())
+}
+
+fn deserialize_face_string<'de, D>(d: D) -> Result<FaceTexture, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(d)?;
+    parse_face_texture(&s).map_err(serde::de::Error::custom)
+}
+
+fn parse_face_texture(s: &str) -> Result<FaceTexture, String> {
+    let (path, tags) = if let Some((p, t)) = s.split_once('#') {
+        (p.to_string(), Some(t))
+    } else {
+        (s.to_string(), None)
+    };
+
+    let mut rotation = Rotation::CCW0;
+    let mut flip_x = false;
+    let mut flip_y = false;
+
+    if let Some(tags) = tags {
+        for tag in tags.split(default_variant_tags::SEP) {
+            if tag.is_empty() {
+                continue;
+            }
+            if let Some(deg_str) = tag.strip_prefix(default_variant_tags::ROT_TEX) {
+                let deg: i32 = deg_str
+                    .parse()
+                    .map_err(|e| format!("Invalid rotation: {}", e))?;
+                rotation = Rotation::from_degrees(deg)
+                    .ok_or_else(|| format!("Invalid rotation degrees: {}", deg))?;
+            } else if tag == default_variant_tags::FLIP_X_TEX {
+                flip_x = true;
+            } else if tag == default_variant_tags::FLIP_Y_TEX {
+                flip_y = true;
+            }
+        }
+    }
+
+    Ok(FaceTexture {
+        path,
+        rotation,
+        flip_x,
+        flip_y,
+    })
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct FaceTexture {
+    pub path: String,
+    #[serde(skip_serializing_if = "is_rotation_zero", default)]
+    pub rotation: Rotation,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub flip_x: bool,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub flip_y: bool,
+}
+
+impl FaceTexture {
+    pub fn new(path: String) -> Self {
+        Self {
+            path,
+            rotation: Rotation::CCW0,
+            flip_x: false,
+            flip_y: false,
+        }
+    }
+
+    pub fn add_rotation(&self, rotation: Rotation) -> Self {
+        Self {
+            path: self.path.clone(),
+            rotation: self.rotation.add(rotation),
+            flip_x: false,
+            flip_y: false,
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut suffix = String::new();
+        if self.rotation != Rotation::CCW0 {
+            suffix.push(default_variant_tags::SEP);
+            suffix.push_str(default_variant_tags::ROT_TEX);
+            suffix.push_str(&self.rotation.degrees().to_string());
+        }
+        if self.flip_x {
+            suffix.push(default_variant_tags::SEP);
+            suffix.push_str(default_variant_tags::FLIP_X_TEX);
+        }
+        if self.flip_y {
+            suffix.push(default_variant_tags::SEP);
+            suffix.push_str(default_variant_tags::FLIP_Y_TEX);
+        }
+
+        if suffix.is_empty() {
+            self.path.clone()
+        } else {
+            format!("{}{}", self.path, suffix)
+        }
+    }
+}
+
+impl BlockTexture {
+    // TODO: these are incorrect for everything but CCW90
+    pub fn rotate_x(self, rot: Rotation) -> Self {
+        if rot == Rotation::CCW0 {
+            return self;
+        }
+        Self {
+            ny: self.z,
+            y: self.nz,
+            z: self.y,
+            nz: self.ny,
+            nx: self
+                .nx
+                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
+            x: self.x.add_rotation(rot),
+        }
+    }
+
+    pub fn rotate_y(self, rot: Rotation) -> Self {
+        if rot == Rotation::CCW0 {
+            return self;
+        }
+        Self {
+            ny: self
+                .ny
+                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
+            y: self.y.add_rotation(rot),
+            z: self.x,
+            nz: self.nx,
+            nx: self.z,
+            x: self.nz,
+        }
+    }
+
+    pub fn rotate_z(self, rot: Rotation) -> Self {
+        if rot == Rotation::CCW0 {
+            return self;
+        }
+        Self {
+            ny: self.nx,
+            y: self.x,
+            z: self.z.add_rotation(rot),
+            nz: self
+                .nz
+                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
+            nx: self.y,
+            x: self.ny,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BlockVolume {
+    pub path: String,
+    #[serde(skip_serializing_if = "is_rotation_zero", default)]
+    pub rotation_x: Rotation,
+    #[serde(skip_serializing_if = "is_rotation_zero", default)]
+    pub rotation_y: Rotation,
+    #[serde(skip_serializing_if = "is_rotation_zero", default)]
+    pub rotation_z: Rotation,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub flip_x: bool,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub flip_y: bool,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub flip_z: bool,
+}
+
+fn is_rotation_zero(r: &Rotation) -> bool {
+    *r == Rotation::CCW0
+}
+
+fn is_false(b: &bool) -> bool {
+    !b
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[serde(into = "i32", try_from = "i32")]
+pub enum Rotation {
+    #[default]
+    CCW0,
+    CCW90,
+    CCW180,
+    CCW270,
+}
+
+impl Rotation {
+    pub fn degrees(self) -> i32 {
+        match self {
+            Rotation::CCW0 => 0,
+            Rotation::CCW90 => 90,
+            Rotation::CCW180 => 180,
+            Rotation::CCW270 => 270,
+        }
+    }
+
+    pub fn from_degrees(deg: i32) -> Option<Self> {
+        match deg {
+            0 => Some(Rotation::CCW0),
+            90 => Some(Rotation::CCW90),
+            180 => Some(Rotation::CCW180),
+            270 => Some(Rotation::CCW270),
+            _ => None,
+        }
+    }
+
+    pub fn add(self, rotation: Self) -> Self {
+        Self::from_degrees((self.degrees() + rotation.degrees()) % 360).unwrap()
+    }
+}
+
+impl From<Rotation> for i32 {
+    fn from(rotation: Rotation) -> Self {
+        rotation.degrees()
+    }
+}
+
+impl TryFrom<i32> for Rotation {
+    type Error = String;
+
+    fn try_from(deg: i32) -> Result<Self, Self::Error> {
+        Self::from_degrees(deg).ok_or_else(|| format!("Invalid rotation degrees: {}", deg))
+    }
+}
+
+pub struct Group {
+    block_ids: BlockIds,
+    rule: GroupRule,
+}
+
+pub enum BlockIds {
+    Blocks(HashSet<String>),
+    VariantSet(String),
+}
+
+pub enum GroupRule {
+    RandomChoice,
+    Custom(serde_json::Value),
+}
+
+pub struct VariantSet {
+    input_block_ids: BlockIds,
+    rotations: Vec<Rotation>,
+    flip_x: bool,
+    flip_y: bool,
+    flip_z: bool,
+    tints: Vec<Color>,
+    custom: Option<serde_json::Value>,
+}
+
+mod default_variant_tags {
+    pub const SEP: char = '#';
+
+    pub const ROT_X: &str = "rx=";
+    pub const ROT_Y: &str = "ry=";
+    pub const ROT_Z: &str = "rz=";
+    pub const FLIP_X: &str = "fx";
+    pub const FLIP_Y: &str = "fy";
+    pub const FLIP_Z: &str = "fz";
+    pub const TINT: &str = "tint=";
+
+    pub const ROT_TEX: &str = "r=";
+    pub const FLIP_X_TEX: &str = "fx";
+    pub const FLIP_Y_TEX: &str = "fy";
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(into = "String", try_from = "String")]
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl From<Color> for String {
+    fn from(color: Color) -> Self {
+        format!(
+            "#{:02x}{:02x}{:02x}{:02x}",
+            color.r, color.g, color.b, color.a
+        )
+    }
+}
+
+impl TryFrom<String> for Color {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        let s = s.strip_prefix('#').ok_or("Color must start with #")?;
+        if s.len() != 8 {
+            return Err(format!("Color must be 8 hex digits, got {}", s.len()));
+        }
+
+        let hex = u32::from_str_radix(s, 16).map_err(|e| e.to_string())?;
+
+        Ok(Color {
+            r: (hex >> 24) as u8,
+            g: (hex >> 16) as u8,
+            b: (hex >> 8) as u8,
+            a: hex as u8,
+        })
+    }
+}
