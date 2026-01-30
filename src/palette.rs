@@ -191,51 +191,54 @@ impl FaceTexture {
 impl BlockTexture {
     // TODO: these are incorrect for everything but CCW90
     pub fn rotate_x(self, rot: Rotation) -> Self {
-        if rot == Rotation::CCW0 {
-            return self;
+        let mut t = self;
+
+        for _ in 0..(rot.degrees() / 90) {
+            t = Self {
+                ny: t.z,
+                y: t.nz,
+                z: t.y,
+                nz: t.ny,
+                nx: t.nx.add_rotation(Rotation::CCW270),
+                x: t.x.add_rotation(Rotation::CCW90),
+            };
         }
-        Self {
-            ny: self.z,
-            y: self.nz,
-            z: self.y,
-            nz: self.ny,
-            nx: self
-                .nx
-                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
-            x: self.x.add_rotation(rot),
-        }
+
+        t
     }
 
     pub fn rotate_y(self, rot: Rotation) -> Self {
-        if rot == Rotation::CCW0 {
-            return self;
+        let mut t = self;
+
+        for _ in 0..(rot.degrees() / 90) {
+            t = Self {
+                ny: t.ny.add_rotation(Rotation::CCW270),
+                y: t.y.add_rotation(Rotation::CCW90),
+                z: t.x,
+                nz: t.nx,
+                nx: t.z,
+                x: t.nz,
+            };
         }
-        Self {
-            ny: self
-                .ny
-                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
-            y: self.y.add_rotation(rot),
-            z: self.x,
-            nz: self.nx,
-            nx: self.z,
-            x: self.nz,
-        }
+
+        t
     }
 
     pub fn rotate_z(self, rot: Rotation) -> Self {
-        if rot == Rotation::CCW0 {
-            return self;
+        let mut t = self;
+
+        for _ in 0..(rot.degrees() / 90) {
+            t = Self {
+                ny: t.nx,
+                y: t.x,
+                z: t.z.add_rotation(Rotation::CCW90),
+                nz: t.nz.add_rotation(Rotation::CCW270),
+                nx: t.y,
+                x: t.ny,
+            };
         }
-        Self {
-            ny: self.nx,
-            y: self.x,
-            z: self.z.add_rotation(rot),
-            nz: self
-                .nz
-                .add_rotation(Rotation::from_degrees(360 - rot.degrees()).unwrap()),
-            nx: self.y,
-            x: self.ny,
-        }
+
+        t
     }
 }
 
