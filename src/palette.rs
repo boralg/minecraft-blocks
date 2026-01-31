@@ -189,7 +189,6 @@ impl FaceTexture {
 }
 
 impl BlockTexture {
-    // TODO: these are incorrect for everything but CCW90
     pub fn rotate_x(self, rot: Rotation) -> Self {
         let mut t = self;
 
