@@ -5,4 +5,4 @@ result
 
 mc_data/*
 !mc_data/.gitkeep
-minecraft_palette
+output/

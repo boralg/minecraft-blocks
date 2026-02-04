@@ -17,7 +17,7 @@ const MC_DIR: &str = "mc_data/mc_assets/assets/minecraft";
 fn main() {
     let mc_dir = Path::new(MC_DIR);
 
-    let output_dir = Path::new("minecraft_palette");
+    let output_dir = Path::new("output");
     let textures_dir = output_dir.join("textures");
 
     fs::create_dir_all(&textures_dir).unwrap_or_else(|e| {
