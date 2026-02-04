@@ -67,8 +67,6 @@ fn main() {
         })
         .collect();
 
-    let materials: Vec<Material> = vec![];
-
     let json_output = serde_json::to_string_pretty(&full_variants).unwrap();
     let full_blocks_path = output_dir.join("full_blocks.json");
     fs::write(&full_blocks_path, &json_output).unwrap_or_else(|e| {
@@ -92,6 +90,16 @@ fn main() {
         &mc_dir.join("textures/block"),
         &textures_dir,
     );
+
+    let palette = Palette {
+        name: "Minecraft Palette".to_owned(),
+        id: "minecraft".to_owned(),
+        materials: full_variants,
+        groups: vec![],
+        variant_sets: vec![],
+    };
+
+    palette.serialize_to_dir(output_dir, &textures_dir).unwrap();
 }
 
 fn copy_textures_from_variants(variants: &Vec<Material>, source_dir: &Path, output_dir: &Path) {

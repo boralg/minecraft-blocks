@@ -1,16 +1,125 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
+    fs,
+    path::{Path, PathBuf},
     time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
 
 pub struct Palette {
-    name: String,
-    id: String,
-    materials: Vec<Material>,
-    groups: Vec<Group>,
-    variant_sets: Vec<VariantSet>,
+    pub name: String,
+    pub id: String,
+    pub materials: Vec<Material>,
+    pub groups: Vec<Group>,
+    pub variant_sets: Vec<VariantSet>,
+}
+
+impl Palette {
+    pub fn serialize_to_dir<P: AsRef<Path>>(
+        &self,
+        output_dir: P,
+        textures_dir: P,
+    ) -> Result<(), String> {
+        let palette_dir = output_dir.as_ref().join(&self.id);
+        fs::create_dir_all(&palette_dir)
+            .map_err(|e| format!("Failed to create palette directory: {}", e))?;
+
+        {
+            let materials_json = serde_json::to_string_pretty(&self.materials)
+                .map_err(|e| format!("Failed to serialize materials: {}", e))?;
+            fs::write(palette_dir.join("materials.json"), materials_json)
+                .map_err(|e| format!("Failed to write materials.json: {}", e))?;
+
+            let groups_json = serde_json::to_string_pretty(&self.groups)
+                .map_err(|e| format!("Failed to serialize groups: {}", e))?;
+            fs::write(palette_dir.join("groups.json"), groups_json)
+                .map_err(|e| format!("Failed to write groups.json: {}", e))?;
+
+            let variant_sets_json = serde_json::to_string_pretty(&self.variant_sets)
+                .map_err(|e| format!("Failed to serialize variant sets: {}", e))?;
+            fs::write(palette_dir.join("variant_sets.json"), variant_sets_json)
+                .map_err(|e| format!("Failed to write variant_sets.json: {}", e))?;
+        }
+
+        let output_textures_dir = palette_dir.join("textures");
+        fs::create_dir_all(&output_textures_dir)
+            .map_err(|e| format!("Failed to create textures directory: {}", e))?;
+
+        {
+            let mut texture_paths = HashSet::new();
+            let mut missing_textures = Vec::new();
+
+            for material in &self.materials {
+                self.visit_material(&material.display, &mut |path| {
+                    let src = textures_dir.as_ref().join(format!("{}.png", path));
+                    if src.exists() {
+                        texture_paths.insert(path.to_string());
+                    } else {
+                        missing_textures.push(path.to_string());
+                    }
+                });
+            }
+
+            if !missing_textures.is_empty() {
+                return Err(format!(
+                    "Missing texture files: {}",
+                    missing_textures.join(", ")
+                ));
+            }
+
+            for texture_path in texture_paths {
+                let src = textures_dir.as_ref().join(format!("{}.png", texture_path));
+                let dst = output_textures_dir.join(format!("{}.png", texture_path));
+
+                if let Some(parent) = dst.parent() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create texture subdirectory: {}", e))?;
+                }
+
+                fs::copy(&src, &dst)
+                    .map_err(|e| format!("Failed to copy texture {}: {}", texture_path, e))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn visit_material<F>(&self, display: &MaterialDisplay, visitor: &mut F)
+    where
+        F: FnMut(&str),
+    {
+        match display {
+            MaterialDisplay::Texture(tex) => {
+                self.visit_block_texture_paths(tex, visitor);
+            }
+            MaterialDisplay::TextureAnimation { frames, .. } => {
+                for frame in frames {
+                    self.visit_block_texture_paths(frame, visitor);
+                }
+            }
+            MaterialDisplay::Volume(vol) => {
+                visitor(&vol.path);
+            }
+            MaterialDisplay::VolumeAnimation { frames, .. } => {
+                for frame in frames {
+                    visitor(&frame.path);
+                }
+            }
+        }
+    }
+
+    fn visit_block_texture_paths<F>(&self, tex: &BlockTexture, visitor: &mut F)
+    where
+        F: FnMut(&str),
+    {
+        visitor(&tex.x.path);
+        visitor(&tex.nx.path);
+        visitor(&tex.y.path);
+        visitor(&tex.ny.path);
+        visitor(&tex.z.path);
+        visitor(&tex.nz.path);
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -315,21 +424,27 @@ impl TryFrom<i32> for Rotation {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Group {
     block_ids: BlockIds,
     rule: GroupRule,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum BlockIds {
-    Blocks(HashSet<String>),
+    Blocks(BTreeSet<String>),
     VariantSet(String),
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum GroupRule {
     RandomChoice,
     Custom(serde_json::Value),
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct VariantSet {
     input_block_ids: BlockIds,
     rotations: Vec<Rotation>,
