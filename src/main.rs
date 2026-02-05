@@ -100,6 +100,7 @@ fn main() {
     };
 
     palette.serialize_to_dir(output_dir, &textures_dir).unwrap();
+    Palette::deserialize_from_dir(output_dir.join("minecraft")).unwrap();
 }
 
 fn copy_textures_from_variants(variants: &Vec<Material>, source_dir: &Path, output_dir: &Path) {
