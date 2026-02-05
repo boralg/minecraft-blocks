@@ -16,6 +16,68 @@ pub struct Palette {
 }
 
 impl Palette {
+    pub fn deserialize_from_dir<P: AsRef<Path>>(palette_dir: P) -> Result<Self, String> {
+        let palette_dir = palette_dir.as_ref();
+
+        let id = palette_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("Invalid palette directory name")?
+            .to_string();
+
+        let name = id.clone();
+
+        let materials_json = fs::read_to_string(&palette_dir.join("materials.json"))
+            .map_err(|e| format!("Failed to read materials.json: {}", e))?;
+        let materials: Vec<Material> = serde_json::from_str(&materials_json)
+            .map_err(|e| format!("Failed to parse materials.json: {}", e))?;
+
+        let groups_json = fs::read_to_string(&palette_dir.join("groups.json"))
+            .map_err(|e| format!("Failed to read groups.json: {}", e))?;
+        let groups: Vec<Group> = serde_json::from_str(&groups_json)
+            .map_err(|e| format!("Failed to parse groups.json: {}", e))?;
+
+        let variant_sets_json = fs::read_to_string(&palette_dir.join("variant_sets.json"))
+            .map_err(|e| format!("Failed to read variant_sets.json: {}", e))?;
+        let variant_sets: Vec<VariantSet> = serde_json::from_str(&variant_sets_json)
+            .map_err(|e| format!("Failed to parse variant_sets.json: {}", e))?;
+
+        let palette = Palette {
+            name,
+            id,
+            materials,
+            groups,
+            variant_sets,
+        };
+
+        let textures_dir = palette_dir.join("textures");
+        if textures_dir.exists() {
+            let mut texture_paths = HashSet::new();
+            let mut missing_textures = Vec::new();
+
+            for material in &palette.materials {
+                palette.visit_material(&material.display, &mut |path| {
+                    texture_paths.insert(path.to_string());
+                });
+            }
+
+            for texture_path in texture_paths {
+                let texture_file = textures_dir.join(format!("{}.png", texture_path));
+                if !texture_file.exists() {
+                    missing_textures.push(texture_path);
+                }
+            }
+
+            if !missing_textures.is_empty() {
+                eprintln!("Warning: Missing textures: {}", missing_textures.join(", "));
+            }
+        } else {
+            eprintln!("Warning: Textures directory not found");
+        }
+
+        Ok(palette)
+    }
+
     pub fn serialize_to_dir<P: AsRef<Path>>(
         &self,
         output_dir: P,
@@ -62,10 +124,7 @@ impl Palette {
             }
 
             if !missing_textures.is_empty() {
-                return Err(format!(
-                    "Missing texture files: {}",
-                    missing_textures.join(", ")
-                ));
+                return Err(format!("Missing textures: {}", missing_textures.join(", ")));
             }
 
             for texture_path in texture_paths {
