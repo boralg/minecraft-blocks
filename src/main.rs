@@ -6,6 +6,8 @@ mod variants;
 
 use std::{collections::HashSet, fs, path::Path, process};
 
+use indexmap::IndexMap;
+
 use crate::cubes::{get_all_empty_blocks, get_all_full_cube_blocks};
 use crate::palette::{BlockTexture, Material, MaterialDisplay, Palette};
 use crate::schema::{blockstate, model};
@@ -42,7 +44,7 @@ fn main() {
 
     let full_cube_blocks = get_all_full_cube_blocks(&blockstates, &models);
 
-    let full_variants: Vec<Material> = all_variants
+    let full_variants: IndexMap<String, Material> = all_variants
         .into_iter()
         .filter(|v| full_cube_blocks.contains(&v.name))
         .map(|v| {
@@ -59,11 +61,13 @@ fn main() {
                 v.name.to_owned()
             };
 
-            Material {
+            (
                 block_id,
-                display: MaterialDisplay::Texture(texture),
-                profile: None,
-            }
+                Material {
+                    display: MaterialDisplay::Texture(texture),
+                    profile: None,
+                },
+            )
         })
         .collect();
 
@@ -86,7 +90,7 @@ fn main() {
     println!("Saved {} empty blocks", empty_blocks.len());
 
     copy_textures_from_variants(
-        &full_variants,
+        full_variants.values(),
         &mc_dir.join("textures/block"),
         &textures_dir,
     );
@@ -95,15 +99,19 @@ fn main() {
         name: "Minecraft Palette".to_owned(),
         id: "minecraft".to_owned(),
         materials: full_variants,
-        groups: vec![],
-        variant_sets: vec![],
+        groups: IndexMap::new(),
+        variant_sets: IndexMap::new(),
     };
 
     palette.serialize_to_dir(output_dir, &textures_dir).unwrap();
     Palette::deserialize_from_dir(output_dir.join("minecraft")).unwrap();
 }
 
-fn copy_textures_from_variants(variants: &Vec<Material>, source_dir: &Path, output_dir: &Path) {
+fn copy_textures_from_variants<'a>(
+    variants: impl Iterator<Item = &'a Material>,
+    source_dir: &Path,
+    output_dir: &Path,
+) {
     let mut textures = HashSet::new();
 
     for variant in variants {

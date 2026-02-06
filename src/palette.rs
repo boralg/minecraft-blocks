@@ -1,18 +1,16 @@
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
-    fs,
-    path::{Path, PathBuf},
-    time::Duration,
+    collections::{BTreeSet, HashMap, HashSet}, fmt, fs, marker::PhantomData, path::{Path, PathBuf}, time::Duration
 };
 
-use serde::{Deserialize, Serialize};
+use indexmap::IndexMap;
+use serde::{de::{MapAccess, Visitor}, Deserialize, Deserializer, Serialize};
 
 pub struct Palette {
     pub name: String,
     pub id: String,
-    pub materials: Vec<Material>,
-    pub groups: Vec<Group>,
-    pub variant_sets: Vec<VariantSet>,
+    pub materials: IndexMap<String, Material>,
+    pub groups: IndexMap<String, Group>,
+    pub variant_sets: IndexMap<String, VariantSet>,
 }
 
 impl Palette {
@@ -29,17 +27,17 @@ impl Palette {
 
         let materials_json = fs::read_to_string(&palette_dir.join("materials.json"))
             .map_err(|e| format!("Failed to read materials.json: {}", e))?;
-        let materials: Vec<Material> = serde_json::from_str(&materials_json)
+        let materials = serde_json::from_str(&materials_json)
             .map_err(|e| format!("Failed to parse materials.json: {}", e))?;
 
         let groups_json = fs::read_to_string(&palette_dir.join("groups.json"))
             .map_err(|e| format!("Failed to read groups.json: {}", e))?;
-        let groups: Vec<Group> = serde_json::from_str(&groups_json)
+        let groups = serde_json::from_str(&groups_json)
             .map_err(|e| format!("Failed to parse groups.json: {}", e))?;
 
         let variant_sets_json = fs::read_to_string(&palette_dir.join("variant_sets.json"))
             .map_err(|e| format!("Failed to read variant_sets.json: {}", e))?;
-        let variant_sets: Vec<VariantSet> = serde_json::from_str(&variant_sets_json)
+        let variant_sets = serde_json::from_str(&variant_sets_json)
             .map_err(|e| format!("Failed to parse variant_sets.json: {}", e))?;
 
         let palette = Palette {
@@ -55,7 +53,7 @@ impl Palette {
             let mut texture_paths = HashSet::new();
             let mut missing_textures = Vec::new();
 
-            for material in &palette.materials {
+            for (_, material) in &palette.materials {
                 palette.visit_material(&material.display, &mut |path| {
                     texture_paths.insert(path.to_string());
                 });
@@ -112,7 +110,7 @@ impl Palette {
             let mut texture_paths = HashSet::new();
             let mut missing_textures = Vec::new();
 
-            for material in &self.materials {
+            for (_, material) in &self.materials {
                 self.visit_material(&material.display, &mut |path| {
                     let src = textures_dir.as_ref().join(format!("{}.png", path));
                     if src.exists() {
@@ -183,7 +181,6 @@ impl Palette {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Material {
-    pub block_id: String,
     pub display: MaterialDisplay,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub profile: Option<MaterialProfile>,
