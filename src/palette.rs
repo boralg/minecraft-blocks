@@ -28,6 +28,7 @@ impl Palette {
 
         let name = id.clone();
 
+        // TODO: this doesn't error on duplicate keys (serde default behavior) and I hate every solution I've found (including forking indexmap)
         let materials_json = fs::read_to_string(&palette_dir.join("materials.json"))
             .map_err(|e| format!("Failed to read materials.json: {}", e))?;
         let materials = serde_json::from_str(&materials_json)
