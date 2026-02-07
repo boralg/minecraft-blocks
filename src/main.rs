@@ -9,10 +9,10 @@ use std::{collections::HashSet, fs, path::Path, process};
 use indexmap::IndexMap;
 
 use crate::cubes::{get_all_empty_blocks, get_all_full_cube_blocks};
-use crate::palette::{BlockTexture, Material, MaterialDisplay, Palette};
+use crate::palette::{Material, MaterialDisplay, Palette};
 use crate::schema::{blockstate, model};
 use crate::textures::get_block_textures;
-use crate::variants::{BlockVariant, get_all_block_variants};
+use crate::variants::get_all_block_variants;
 
 const MC_DIR: &str = "mc_data/mc_assets/assets/minecraft";
 

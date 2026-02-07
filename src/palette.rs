@@ -1,9 +1,12 @@
 use std::{
-    collections::{BTreeSet, HashMap, HashSet}, fmt, fs, marker::PhantomData, path::{Path, PathBuf}, time::Duration
+    collections::{BTreeSet, HashSet},
+    fs,
+    path::Path,
+    time::Duration,
 };
 
 use indexmap::IndexMap;
-use serde::{de::{MapAccess, Visitor}, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 pub struct Palette {
     pub name: String,
